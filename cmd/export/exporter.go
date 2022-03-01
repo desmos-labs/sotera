@@ -12,8 +12,6 @@ import (
 	sdk "github.com/cosmos/cosmos-sdk/types"
 	"github.com/cosmos/cosmos-sdk/x/auth/vesting/exported"
 	stakingtypes "github.com/cosmos/cosmos-sdk/x/staking/types"
-	"github.com/forbole/bdjuno/v2/modules"
-	banksource "github.com/forbole/bdjuno/v2/modules/bank/source"
 	"github.com/forbole/juno/v2/node"
 	nodebuilder "github.com/forbole/juno/v2/node/builder"
 	nodeconfig "github.com/forbole/juno/v2/node/config"
@@ -24,8 +22,7 @@ import (
 
 // Exporter allows to easily export the various accounts data
 type Exporter struct {
-	node       node.Node
-	bankSource banksource.Source
+	node node.Node
 
 	limitHeight int64
 }
@@ -38,15 +35,8 @@ func NewExporter(cfg nodeconfig.Config, config *params.EncodingConfig) (*Exporte
 		return nil, err
 	}
 
-	// Build the sources
-	sources, err := modules.BuildSources(cfg, config)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Exporter{
-		node:       chainNode,
-		bankSource: sources.BankSource,
+		node: chainNode,
 	}, nil
 }
 
@@ -146,12 +136,6 @@ func (e *Exporter) getTransactions(action, address string, height int64) ([]*cor
 // handleMsgDelegate handles the given MsgDelegate present inside the provided
 // transaction and send by the given account
 func (e *Exporter) handleMsgDelegate(account exported.VestingAccount, tx *juno.Tx, msg *stakingtypes.MsgDelegate) error {
-	// Get the balance
-	balance, err := e.bankSource.GetAccountBalance(account.GetAddress().String(), tx.Height)
-	if err != nil {
-		return err
-	}
-
 	// Get the timestamp
 	timestamp, err := time.Parse(time.RFC3339, tx.Timestamp)
 	if err != nil {
@@ -159,6 +143,7 @@ func (e *Exporter) handleMsgDelegate(account exported.VestingAccount, tx *juno.T
 	}
 
 	// Track the delegation
+	balance := sdk.NewCoins(sdk.NewCoin(msg.Amount.Denom, msg.Amount.Amount.AddRaw(10000)))
 	account.TrackDelegation(timestamp, balance, sdk.NewCoins(msg.Amount))
 
 	return nil
